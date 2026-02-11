@@ -1,22 +1,58 @@
+"""
+train.py — Load processed data, split, scale, train a model, and save it to disk.
+"""
+
+import pickle
 import pandas as pd
-import numpy as np
-from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import accuracy_score, classification_report
 
-df = pd.read_csv('../input/telco-customer-churn/WA_Fn-UseC_-Telco-Customer-Churn.csv')
 
-df = df.drop(['customerID'], axis = 1)
+# --- Settings (hard-coded for now) ---
+PROCESSED_DATA = "data/processed/churn_processed.csv"
+MODEL_PATH = "models/model.pkl"
+TEST_SIZE = 0.30
+RANDOM_STATE = 40
+NUM_COLS = ["tenure", "MonthlyCharges", "TotalCharges"]
 
-df['TotalCharges'] = pd.to_numeric(df.TotalCharges, errors='coerce')
 
-df.drop(labels=df[df['tenure'] == 0].index, axis=0, inplace=True)
+def main():
+    # Load processed data
+    print(f"Loading data from {PROCESSED_DATA} ...")
+    df = pd.read_csv(PROCESSED_DATA)
 
-df.fillna(df["TotalCharges"].mean())
+    # Separate features and target
+    X = df.drop(columns=["Churn"])
+    y = df["Churn"].values
 
-df["SeniorCitizen"]= df["SeniorCitizen"].map({0: "No", 1: "Yes"})
+    # Train / test split (stratified to preserve class balance)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
+    )
 
-def object_to_int(dataframe_series):
-    if dataframe_series.dtype=='object':
-        dataframe_series = LabelEncoder().fit_transform(dataframe_series)
-    return dataframe_series
+    # Scale numerical columns
+    scaler = StandardScaler()
+    X_train[NUM_COLS] = scaler.fit_transform(X_train[NUM_COLS])
+    X_test[NUM_COLS] = scaler.transform(X_test[NUM_COLS])
 
-df = df.apply(lambda x: object_to_int(x))
+    # Train model
+    print("Training GradientBoostingClassifier ...")
+    model = GradientBoostingClassifier(random_state=RANDOM_STATE)
+    model.fit(X_train, y_train)
+
+    # Quick evaluation on test set
+    yhat = model.predict(X_test)
+    print(f"Test accuracy: {accuracy_score(y_test, yhat):.4f}")
+    print(classification_report(y_test, yhat))
+
+    # Save model and scaler together
+    artifact = {"model": model, "scaler": scaler}
+    with open(MODEL_PATH, "wb") as f:
+        pickle.dump(artifact, f)
+    print(f"Model saved to {MODEL_PATH}")
+
+
+if __name__ == "__main__":
+    main()
