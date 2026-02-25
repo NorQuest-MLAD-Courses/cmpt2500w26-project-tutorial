@@ -12,3 +12,5 @@ mlruns/
 .dvc/cache/
 .dvc/tmp/
 .dvc/config.local
+
+.vscode/settings.json
