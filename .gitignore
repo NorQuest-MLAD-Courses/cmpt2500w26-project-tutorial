@@ -5,3 +5,17 @@ __pycache__/
 models/*.pkl
 data/processed/
 mlruns/
+
+# Data files (tracked by DVC, not Git)
+data/raw/
+data/processed/
+
+# Exclude example/sample data (keep directory structure)
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!models/.gitkeep
+
+# DVC
+.dvc/cache/
+.dvc/tmp/
+.dvc/config.local
