@@ -3,3 +3,4 @@ pandas==3.0.0
 scikit-learn==1.8.0
 pytest==9.0.2
 PyYAML==6.0.3
+mlflow==3.10.0

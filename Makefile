@@ -1,4 +1,4 @@
-.PHONY: venv preprocess train evaluate predict test clean
+.PHONY: venv preprocess train evaluate predict test mlflow-ui clean
 
 venv:
 	python3 -m venv .venv
@@ -20,5 +20,8 @@ predict:
 test:
 	.venv/bin/pytest
 
+mlflow-ui:
+	.venv/bin/mlflow ui --backend-store-uri mlruns
+
 clean:
-	rm -rf .venv models/*.pkl data/processed/*.csv
+	rm -rf .venv models/*.pkl data/processed/*.csv mlruns/

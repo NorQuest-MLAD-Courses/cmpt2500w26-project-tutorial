@@ -19,3 +19,7 @@ model:
   name: GradientBoostingClassifier
   params:
     random_state: 40
+
+mlflow:
+  tracking_uri: mlruns
+  experiment_name: churn-prediction

@@ -10,20 +10,22 @@ make venv
 
 ## Usage
 
-All settings are read from `config/default.yaml`. Command-line flags can override paths.
-
 ```bash
 make preprocess
-make train
+make train          # trains and logs to MLflow
 make evaluate
 make predict
 ```
 
-Use a custom config:
+## Experiment Tracking
+
+Training runs are logged to MLflow. Launch the dashboard:
 
 ```bash
-.venv/bin/python src/train.py --config config/experiment.yaml
+make mlflow-ui
 ```
+
+Then open <http://127.0.0.1:5000> in a browser.
 
 ## Testing
 
@@ -53,6 +55,7 @@ make test
 │   │   └── WA_Fn-UseC_-Telco-Customer-Churn.csv
 │   └── processed/
 ├── models/
+├── mlruns/              (created by MLflow, git-ignored)
 ├── pytest.ini
 ├── Makefile
 ├── requirements.txt
