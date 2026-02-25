@@ -25,3 +25,9 @@ mlflow-ui:
 
 clean:
 	rm -rf .venv models/*.pkl data/processed/*.csv mlruns/
+
+dvc-push:
+	dvc push
+
+dvc-pull:
+	dvc pull

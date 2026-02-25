@@ -1,16 +1,28 @@
+# ---- Python environment ----
 .venv/
+
+# ---- Bytecode and caches ----
 __pycache__/
 *.pyc
 .pytest_cache/
-models/*.pkl
-data/processed/
-mlruns/
 
+# ---- ML artifacts ----
+models/*.pkl
 !models/.gitkeep
 
-# DVC
+# ---- Data ----
+# DVC also handles this via data/.gitignore, but we list it
+# here so the root .gitignore is self-documenting.
+data/processed/
+
+# ---- Experiment tracking (MLflow) ----
+mlruns/
+mlflow.db
+
+# ---- Data versioning (DVC) ----
 .dvc/cache/
 .dvc/tmp/
 .dvc/config.local
 
-.vscode/settings.json
+# ---- IDE ----
+.vscode/
