@@ -31,3 +31,6 @@ dvc-push:
 
 dvc-pull:
 	dvc pull
+
+tune:
+	.venv/bin/python src/tune.py
