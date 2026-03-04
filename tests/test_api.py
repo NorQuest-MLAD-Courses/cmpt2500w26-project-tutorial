@@ -57,3 +57,46 @@ def test_v1_single_prediction(client):
     assert "probability" in response.json
     assert response.json["model_version"] == "v1"
     assert response.json["prediction"] in ("Yes", "No")
+
+
+# ---- Step 10: Validation, batch, v2 ----
+
+def test_v1_batch_prediction(client):
+    """POST /v1/predict with a list returns a list of predictions."""
+    response = client.post("/v1/predict", json=[VALID_PAYLOAD, VALID_PAYLOAD])
+    assert response.status_code == 200
+    assert isinstance(response.json, list)
+    assert len(response.json) == 2
+    assert response.json[0]["model_version"] == "v1"
+
+
+def test_v1_missing_features(client):
+    """POST /v1/predict with missing fields returns 400."""
+    response = client.post("/v1/predict", json={"tenure": 10})
+    assert response.status_code == 400
+    assert "Missing required features" in response.json["error"]
+
+
+def test_v1_wrong_type(client):
+    """POST /v1/predict with wrong data type returns 400."""
+    bad = VALID_PAYLOAD.copy()
+    bad["tenure"] = "twelve"
+    response = client.post("/v1/predict", json=bad)
+    assert response.status_code == 400
+    assert "Invalid type for tenure" in response.json["error"]
+
+
+def test_v1_empty_body(client):
+    """POST /v1/predict with no body returns 400."""
+    response = client.post("/v1/predict",
+                           data="",
+                           content_type="application/json")
+    assert response.status_code == 400
+
+
+def test_v2_single_prediction(client):
+    """POST /v2/predict returns a prediction with model_version v2."""
+    response = client.post("/v2/predict", json=VALID_PAYLOAD)
+    assert response.status_code == 200
+    assert response.json["model_version"] == "v2"
+    assert response.json["prediction"] in ("Yes", "No")

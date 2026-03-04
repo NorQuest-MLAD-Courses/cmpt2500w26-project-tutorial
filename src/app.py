@@ -41,6 +41,64 @@ CATEGORICAL_FEATURES = [
 REQUIRED_FEATURES = NUMERICAL_FEATURES + CATEGORICAL_FEATURES
 
 
+# ---- Validation ----
+
+def validate_input(record):
+    """
+    Check that a single record has all required features with correct types.
+    Returns (error_message, status_code) or (None, 200) if valid.
+    """
+    missing = [f for f in REQUIRED_FEATURES if f not in record]
+    if missing:
+        return f"Missing required features: {', '.join(missing)}", 400
+
+    for feat in NUMERICAL_FEATURES:
+        if not isinstance(record[feat], (int, float)):
+            return (f"Invalid type for {feat}: expected a number, "
+                    f"got {type(record[feat]).__name__}"), 400
+
+    for feat in CATEGORICAL_FEATURES:
+        if not isinstance(record[feat], str):
+            return (f"Invalid type for {feat}: expected a string, "
+                    f"got {type(record[feat]).__name__}"), 400
+
+    return None, 200
+
+
+# ---- Prediction helper ----
+
+def run_prediction(model, model_label, json_data):
+    """
+    Validate, predict, and format results.
+    Handles both single records and batches.
+    """
+    is_batch = isinstance(json_data, list)
+    records = json_data if is_batch else [json_data]
+
+    # Validate every record before touching the model
+    for record in records:
+        error, status = validate_input(record)
+        if error:
+            return jsonify({"error": error}), status
+
+    try:
+        input_df = pd.DataFrame(records)[REQUIRED_FEATURES]
+        yhat = model.predict(input_df)
+        proba = model.predict_proba(input_df)
+    except Exception as e:
+        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
+
+    results = []
+    for i in range(len(yhat)):
+        results.append({
+            "prediction": "Yes" if yhat[i] == 1 else "No",
+            "probability": float(proba[i][yhat[i]]),
+            "model_version": model_label,
+        })
+
+    return jsonify(results if is_batch else results[0])
+
+
 # ---- Endpoints ----
 
 @app.route("/health", methods=["GET"])
@@ -51,25 +109,20 @@ def health():
 
 @app.route("/v1/predict", methods=["POST"])
 def predict_v1():
-    """Accept customer data as JSON, return a churn prediction from model v1."""
+    """Predict churn using model v1."""
     json_data = request.get_json()
     if not json_data:
         return jsonify({"error": "No input data provided"}), 400
+    return run_prediction(model_v1, "v1", json_data)
 
-    # Convert to DataFrame (single row)
-    input_df = pd.DataFrame([json_data])
 
-    try:
-        yhat = model_v1.predict(input_df[REQUIRED_FEATURES])
-        proba = model_v1.predict_proba(input_df[REQUIRED_FEATURES])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-    return jsonify({
-        "prediction": "Yes" if yhat[0] == 1 else "No",
-        "probability": float(proba[0][yhat[0]]),
-        "model_version": "v1",
-    })
+@app.route("/v2/predict", methods=["POST"])
+def predict_v2():
+    """Predict churn using model v2."""
+    json_data = request.get_json()
+    if not json_data:
+        return jsonify({"error": "No input data provided"}), 400
+    return run_prediction(model_v2, "v2", json_data)
 
 
 if __name__ == "__main__":
