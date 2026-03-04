@@ -6,8 +6,10 @@ import os
 import pickle
 import pandas as pd
 from flask import Flask, jsonify, request
+from flasgger import Swagger
 
 app = Flask(__name__)
+swagger = Swagger(app)
 
 
 # ---- Load models at startup ----
@@ -103,13 +105,160 @@ def run_prediction(model, model_label, json_data):
 
 @app.route("/health", methods=["GET"])
 def health():
-    """Return a simple status check."""
+    """
+    Health Check
+    ---
+    responses:
+      200:
+        description: API is alive and running.
+    """
     return jsonify({"status": "ok"})
+
+
+@app.route("/info", methods=["GET"])
+def info():
+    """
+    API Information
+    Returns a description of the API, available endpoints,
+    and the expected input format for predictions.
+    ---
+    responses:
+      200:
+        description: API information and usage guide.
+    """
+    return jsonify({
+        "message": "Telco Customer Churn Prediction API",
+        "endpoints": {
+            "health": "GET /health",
+            "info": "GET /info",
+            "predict_v1": "POST /v1/predict",
+            "predict_v2": "POST /v2/predict",
+            "docs": "GET /apidocs/",
+        },
+        "required_input_format": {
+            "numerical_features": NUMERICAL_FEATURES,
+            "categorical_features": CATEGORICAL_FEATURES,
+            "example": {
+                "tenure": 12,
+                "MonthlyCharges": 59.95,
+                "TotalCharges": 720.50,
+                "Contract": "One year",
+                "PaymentMethod": "Electronic check",
+                "OnlineSecurity": "No",
+                "TechSupport": "No",
+                "InternetService": "DSL",
+                "gender": "Female",
+                "SeniorCitizen": "No",
+                "Partner": "Yes",
+                "Dependents": "No",
+                "PhoneService": "Yes",
+                "MultipleLines": "No",
+                "PaperlessBilling": "Yes",
+                "OnlineBackup": "Yes",
+                "DeviceProtection": "No",
+                "StreamingTV": "No",
+                "StreamingMovies": "No",
+            },
+        },
+    })
 
 
 @app.route("/v1/predict", methods=["POST"])
 def predict_v1():
-    """Predict churn using model v1."""
+    """
+    Predict churn using model v1
+    ---
+    tags:
+      - Predictions
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        description: >
+          Customer data. Send a single JSON object or a list of objects
+          for batch prediction.
+        schema:
+          type: object
+          properties:
+            tenure:
+              type: integer
+              example: 12
+            MonthlyCharges:
+              type: number
+              example: 59.95
+            TotalCharges:
+              type: number
+              example: 720.50
+            Contract:
+              type: string
+              example: "One year"
+            gender:
+              type: string
+              example: "Female"
+            SeniorCitizen:
+              type: string
+              example: "No"
+            Partner:
+              type: string
+              example: "Yes"
+            Dependents:
+              type: string
+              example: "No"
+            PhoneService:
+              type: string
+              example: "Yes"
+            MultipleLines:
+              type: string
+              example: "No"
+            InternetService:
+              type: string
+              example: "DSL"
+            OnlineSecurity:
+              type: string
+              example: "No"
+            OnlineBackup:
+              type: string
+              example: "Yes"
+            DeviceProtection:
+              type: string
+              example: "No"
+            TechSupport:
+              type: string
+              example: "No"
+            StreamingTV:
+              type: string
+              example: "No"
+            StreamingMovies:
+              type: string
+              example: "No"
+            PaperlessBilling:
+              type: string
+              example: "Yes"
+            PaymentMethod:
+              type: string
+              example: "Electronic check"
+    responses:
+      200:
+        description: Prediction successful.
+        schema:
+          type: object
+          properties:
+            prediction:
+              type: string
+              example: "No"
+            probability:
+              type: number
+              example: 0.9431
+            model_version:
+              type: string
+              example: "v1"
+      400:
+        description: Invalid input data.
+      500:
+        description: Internal server error.
+    """
     json_data = request.get_json()
     if not json_data:
         return jsonify({"error": "No input data provided"}), 400
@@ -118,7 +267,100 @@ def predict_v1():
 
 @app.route("/v2/predict", methods=["POST"])
 def predict_v2():
-    """Predict churn using model v2."""
+    """
+    Predict churn using model v2
+    ---
+    tags:
+      - Predictions
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        description: >
+          Customer data. Send a single JSON object or a list of objects
+          for batch prediction.
+        schema:
+          type: object
+          properties:
+            tenure:
+              type: integer
+              example: 12
+            MonthlyCharges:
+              type: number
+              example: 59.95
+            TotalCharges:
+              type: number
+              example: 720.50
+            Contract:
+              type: string
+              example: "One year"
+            gender:
+              type: string
+              example: "Female"
+            SeniorCitizen:
+              type: string
+              example: "No"
+            Partner:
+              type: string
+              example: "Yes"
+            Dependents:
+              type: string
+              example: "No"
+            PhoneService:
+              type: string
+              example: "Yes"
+            MultipleLines:
+              type: string
+              example: "No"
+            InternetService:
+              type: string
+              example: "DSL"
+            OnlineSecurity:
+              type: string
+              example: "No"
+            OnlineBackup:
+              type: string
+              example: "Yes"
+            DeviceProtection:
+              type: string
+              example: "No"
+            TechSupport:
+              type: string
+              example: "No"
+            StreamingTV:
+              type: string
+              example: "No"
+            StreamingMovies:
+              type: string
+              example: "No"
+            PaperlessBilling:
+              type: string
+              example: "Yes"
+            PaymentMethod:
+              type: string
+              example: "Electronic check"
+    responses:
+      200:
+        description: Prediction successful.
+        schema:
+          type: object
+          properties:
+            prediction:
+              type: string
+              example: "No"
+            probability:
+              type: number
+              example: 0.9431
+            model_version:
+              type: string
+              example: "v2"
+      400:
+        description: Invalid input data.
+      500:
+        description: Internal server error.
+    """
     json_data = request.get_json()
     if not json_data:
         return jsonify({"error": "No input data provided"}), 400

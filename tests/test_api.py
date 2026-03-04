@@ -100,3 +100,16 @@ def test_v2_single_prediction(client):
     assert response.status_code == 200
     assert response.json["model_version"] == "v2"
     assert response.json["prediction"] in ("Yes", "No")
+
+
+# ---- Step 11: Info / documentation ----
+
+def test_info(client):
+    """GET /info returns API description with endpoints and input format."""
+    response = client.get("/info")
+    assert response.status_code == 200
+    assert "endpoints" in response.json
+    assert "required_input_format" in response.json
+    assert "numerical_features" in response.json["required_input_format"]
+    assert "categorical_features" in response.json["required_input_format"]
+    assert "example" in response.json["required_input_format"]
