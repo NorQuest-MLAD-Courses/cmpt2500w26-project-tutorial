@@ -1,4 +1,4 @@
-.PHONY: venv preprocess train tune evaluate predict test api mlflow-ui dvc-push dvc-pull clean
+.PHONY: venv preprocess train tune evaluate predict test api mlflow-ui dvc-push dvc-pull docker-build docker-run docker-stop clean
 
 venv:
 	python3 -m venv .venv
@@ -12,7 +12,7 @@ train:
 	.venv/bin/python src/train.py
 
 tune:
-	cd src && ../.venv/bin/python tune.py
+	.venv/bin/python src/tune.py
 
 evaluate:
 	.venv/bin/python src/evaluate.py
@@ -34,6 +34,15 @@ dvc-push:
 
 dvc-pull:
 	dvc pull
+
+docker-build:
+	docker build -t churn-api .
+
+docker-run:
+	docker run -d --name churn-api -p 5000:5000 churn-api
+
+docker-stop:
+	docker stop churn-api && docker rm churn-api
 
 clean:
 	rm -rf .venv models/*.pkl data/processed/*.csv mlruns/

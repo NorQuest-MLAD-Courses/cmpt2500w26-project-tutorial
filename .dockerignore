@@ -1,0 +1,36 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Data (not needed by the API)
+data/
+
+# Experiment tracking
+mlruns/
+mlflow.db
+
+# DVC
+.dvc/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+
+# Docker (avoid recursive context)
+Dockerfile
+Dockerfile.mlflow
+docker-compose.yml
+.dockerignore
+
+# Tests and config not needed at runtime
+tests/
+config/
+pytest.ini
+
+# Documentation
+*.md
