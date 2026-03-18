@@ -3,6 +3,7 @@ train.py — Load processed data, split, train a pipeline, save it, and log to M
 """
 
 import argparse
+import os
 import pickle
 import pandas as pd
 import mlflow
@@ -49,7 +50,7 @@ def main():
     model_params = cfg["model"]["params"]
 
     # --- MLflow setup ---
-    mlflow.set_tracking_uri(cfg["mlflow"]["tracking_uri"])
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", cfg["mlflow"]["tracking_uri"]))
     mlflow.set_experiment(cfg["mlflow"]["experiment_name"])
 
     print(f"Loading data from {data_path} ...")

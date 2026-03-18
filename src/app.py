@@ -3,10 +3,28 @@ app.py — Flask REST API for the churn prediction service.
 """
 
 import os
+import logging
 import pickle
 import pandas as pd
 from flask import Flask, jsonify, request
 from flasgger import Swagger
+
+# ---- Logging configuration ----
+
+log_dir = os.environ.get("LOG_DIR", "logs")
+os.makedirs(log_dir, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(os.path.join(log_dir, "api.log")),
+    ],
+)
+
+logger = logging.getLogger("churn_api")
+
 
 app = Flask(__name__)
 swagger = Swagger(app)
@@ -25,7 +43,7 @@ MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 model_v1 = load_model(os.path.join(MODEL_DIR, "model_v1.pkl"))
 model_v2 = load_model(os.path.join(MODEL_DIR, "model_v2.pkl"))
 
-print(f"Loaded model_v1 and model_v2 from {MODEL_DIR}")
+logger.info("Loaded model_v1 and model_v2 from %s", MODEL_DIR)
 
 
 # ---- Feature definitions ----
@@ -81,6 +99,7 @@ def run_prediction(model, model_label, json_data):
     for record in records:
         error, status = validate_input(record)
         if error:
+            logger.warning("Validation failed for %s: %s", model_label, error)
             return jsonify({"error": error}), status
 
     try:
@@ -88,6 +107,7 @@ def run_prediction(model, model_label, json_data):
         yhat = model.predict(input_df)
         proba = model.predict_proba(input_df)
     except Exception as e:
+        logger.error("Prediction failed for %s: %s", model_label, str(e))
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
     results = []
@@ -97,6 +117,10 @@ def run_prediction(model, model_label, json_data):
             "probability": float(proba[i][yhat[i]]),
             "model_version": model_label,
         })
+
+    logger.info("Prediction successful: %s, %d record(s), result=%s",
+                model_label, len(records),
+                [r["prediction"] for r in results])
 
     return jsonify(results if is_batch else results[0])
 
@@ -261,6 +285,7 @@ def predict_v1():
     """
     json_data = request.get_json()
     if not json_data:
+        logger.warning("v1/predict called with no input data")
         return jsonify({"error": "No input data provided"}), 400
     return run_prediction(model_v1, "v1", json_data)
 
@@ -363,10 +388,12 @@ def predict_v2():
     """
     json_data = request.get_json()
     if not json_data:
+        logger.warning("v2/predict called with no input data")
         return jsonify({"error": "No input data provided"}), 400
     return run_prediction(model_v2, "v2", json_data)
 
 
 if __name__ == "__main__":
+    logger.info("Starting prediction API service (development mode)")
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host="0.0.0.0", port=port)

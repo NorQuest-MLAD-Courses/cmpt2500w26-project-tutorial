@@ -1,114 +1,180 @@
 # Telco Customer Churn Prediction
 
-A machine learning project that predicts whether a telecommunications customer will churn (cancel their service). The trained models are served through a REST API, enabling any application to request churn predictions over HTTP.
+An end-to-end machine learning project that predicts whether a telecom customer will churn. The project spans data preprocessing, model training, experiment tracking, hyperparameter tuning, a REST API for real-time predictions, containerisation with Docker, and publishing to Docker Hub.
 
-## Problem Description
 
-Customer churn — the loss of clients to a competitor or cancellation of service — is a major revenue concern for telecom providers. This project trains binary classifiers on historical customer data, tracks experiments with MLflow, versions data with DVC, and exposes the best models through a Flask REST API with interactive Swagger documentation.
-
-## Project Structure
+## Project structure
 
 ```
-├── config/
-│   └── default.yaml            # Centralised configuration (paths, features, hyperparameters)
-├── data/
-│   ├── raw/                    # Original dataset (managed by DVC)
-│   │   └── WA_Fn-UseC_-Telco-Customer-Churn.csv
-│   ├── processed/              # Cleaned and encoded data (managed by DVC)
-│   │   └── churn_processed.csv
-│   ├── raw.dvc                 # DVC metadata pointer
-│   └── processed.dvc           # DVC metadata pointer
-├── models/
-│   ├── model_v1.pkl            # Best model (deployment-ready pipeline)
-│   └── model_v2.pkl            # Second-best model (deployment-ready pipeline)
+churn-prediction/
 ├── src/
-│   ├── app.py                  # Flask REST API (prediction service)
-│   ├── preprocess.py           # Load raw data, clean, encode, save
-│   ├── train.py                # Train pipeline, log to MLflow, save model
-│   ├── tune.py                 # Hyperparameter search across model families
-│   ├── evaluate.py             # Load model, report metrics on test split
-│   ├── predict.py              # Load model, output predictions (CLI)
+│   ├── preprocess.py           # Data cleaning and feature encoding
+│   ├── train.py                # Model training with MLflow logging
+│   ├── tune.py                 # Hyperparameter search (deployment-ready pipelines)
+│   ├── evaluate.py             # Model evaluation and metrics
+│   ├── predict.py              # CLI predictions from a saved model
+│   ├── app.py                  # Flask REST API with structured logging
 │   └── utils/
 │       ├── __init__.py
 │       └── config.py           # YAML config loader
 ├── tests/
-│   ├── test_api.py             # API endpoint tests (Flask test client)
-│   ├── test_preprocess.py      # Data cleaning and encoding tests
-│   ├── test_train.py           # Pipeline construction and fitting tests
-│   └── test_config.py          # Config loading tests
+│   ├── test_preprocess.py
+│   ├── test_train.py
+│   ├── test_config.py
+│   └── test_api.py
+├── config/
+│   └── default.yaml            # Centralised project settings
+├── models/                     # Saved model artifacts (.pkl, git-ignored)
+├── data/
+│   ├── raw/                    # Original CSV (tracked by DVC)
+│   │   └── raw.dvc             # DVC metadata pointer
+│   └── processed/              # Cleaned CSV (tracked by DVC)
+│       └── processed.dvc       # DVC metadata pointer
+├── logs/                       # Application logs (git-ignored)
 ├── .dvc/
-│   └── config                  # DVC remote configuration
-├── Makefile                    # Automation targets
+├── Dockerfile                  # API container image
+├── Dockerfile.mlflow           # MLflow server container image
+├── docker-compose.yml          # Multi-container orchestration
+├── .dockerignore               # Files excluded from Docker build context
 ├── requirements.txt            # Python dependencies
-├── pytest.ini                  # Test runner configuration
+├── Makefile                    # Automation targets
+├── pytest.ini                  # Test configuration
 ├── .gitignore
 └── README.md
 ```
 
-## Getting Started
+
+## Quick start
 
 ### Prerequisites
 
-- Python 3.12+
-- Git
-- A DagsHub account (for DVC remote storage)
+Python 3.10+, pip, and Git. For containerised deployment, Docker and Docker Compose are also required. GitHub Codespaces environments include all of these out of the box.
 
-### Installation
+### Local setup
 
 ```bash
-# Clone the repository
 git clone <your-repo-url>
 cd churn-prediction
-
-# Create a virtual environment and install dependencies
 make venv
-
-# Activate the environment
-source .venv/bin/activate
 ```
 
-### Pulling Data with DVC
-
-The dataset and processed files are managed by DVC, not stored in Git. After cloning, pull them from the remote:
+Pull the data from the DVC remote (requires credentials configured once):
 
 ```bash
-# Set DagsHub credentials (first time or new Codespace only)
 dvc remote modify origin --local access_key_id <YOUR_TOKEN>
 dvc remote modify origin --local secret_access_key <YOUR_TOKEN>
-
-# Pull data
 dvc pull
 ```
 
-## Usage
+### Run the ML pipeline
 
-### Running the API
+```bash
+make preprocess
+make train
+make evaluate
+```
 
-The primary interface to the models is the REST API:
+### Hyperparameter tuning
+
+The tuning script searches across GradientBoosting, RandomForest, and LogisticRegression with full parameter grids. Each run is logged to MLflow. The top two models are saved as deployment-ready pipelines that handle all preprocessing internally.
+
+```bash
+make tune
+```
+
+This produces `models/model_v1.pkl` (best F1) and `models/model_v2.pkl` (second-best F1). These files are required before running the API or building the Docker image.
+
+### Run the API locally
 
 ```bash
 make api
-# or: python src/app.py
 ```
 
-The server starts on `http://127.0.0.1:5000`. In GitHub Codespaces, click "Make Public" when prompted and use the forwarded URL.
+The API starts on `http://localhost:5000`. Interactive Swagger documentation is available at `/apidocs/`.
 
-### API Endpoints
+
+## Docker
+
+### Single container (API only)
+
+Build and run the API in a Docker container:
+
+```bash
+make docker-build
+make docker-run
+```
+
+The API serves at `http://localhost:5000`. In Codespaces, use the forwarded URL shown in the Ports tab.
+
+Stop the container:
+
+```bash
+make docker-stop
+```
+
+### Docker Compose (API + MLflow)
+
+Launch both the prediction API and the MLflow tracking UI as a multi-container application:
+
+```bash
+make compose-up
+```
+
+This starts two services connected by an internal Docker network (`ml-network`):
+
+| Service | Port | URL |
+|---------|------|-----|
+| API | 5000 | `http://localhost:5000` |
+| MLflow UI | 5001 | `http://localhost:5001` |
+
+In Codespaces, both ports appear in the **Ports** tab. Click the globe icon to open each in your browser.
+
+**Volume mounts.** The Compose setup mounts three directories from the host: `models/` (so the API serves whichever models are on disk), `data/` (so training can run inside the container), and `logs/` (so application logs persist across container restarts). The MLflow container mounts `mlruns/` so experiment history is shared between the container and local tools.
+
+**Networking.** Both services are attached to `ml-network`. Inside the network, the API container can reach the MLflow server at `http://mlflow:5001`. The `MLFLOW_TRACKING_URI` environment variable is set automatically by Compose. This means `train.py` and `tune.py` log directly to the containerised MLflow server when run inside the API container.
+
+**Run training inside the container:**
+
+```bash
+make compose-train
+make compose-tune
+```
+
+These commands execute the training or tuning script inside a temporary API container. Because `MLFLOW_TRACKING_URI` points to the MLflow container, experiment runs are logged there and immediately visible in the MLflow UI at `http://localhost:5001`.
+
+Stop and remove the containers:
+
+```bash
+make compose-down
+```
+
+### Docker Hub
+
+After verifying everything works, publish your images to Docker Hub:
+
+```bash
+docker login
+make docker-build
+make compose-up          # builds both images
+DOCKER_USER=<your-username> make docker-tag
+DOCKER_USER=<your-username> make docker-push
+```
+
+
+## API endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/health` | Health check — returns `{"status": "ok"}` |
-| `GET` | `/info` | API documentation — lists endpoints, features, and a request example |
-| `POST` | `/v1/predict` | Churn prediction using model v1 (best model) |
-| `POST` | `/v2/predict` | Churn prediction using model v2 (second-best model) |
-| `GET` | `/apidocs/` | Interactive Swagger UI with live request testing |
+| GET | `/health` | Returns `{"status": "ok"}` if the service is running |
+| GET | `/info` | Returns available endpoints, required features, and an example payload |
+| POST | `/v1/predict` | Churn prediction using model v1 (best F1) |
+| POST | `/v2/predict` | Churn prediction using model v2 (second-best F1) |
+| GET | `/apidocs/` | Interactive Swagger UI for testing endpoints |
 
-### Making Predictions
-
-Send a `POST` request with customer data as JSON:
+### Example request
 
 ```bash
-curl -X POST http://127.0.0.1:5000/v1/predict \
+curl -X POST http://localhost:5000/v1/predict \
   -H "Content-Type: application/json" \
   -d '{
     "tenure": 12,
@@ -133,136 +199,98 @@ curl -X POST http://127.0.0.1:5000/v1/predict \
   }'
 ```
 
-Response:
+Both endpoints accept a single JSON object or a JSON array for batch predictions.
 
-```json
-{
-  "prediction": "No",
-  "probability": 0.9431,
-  "model_version": "v1"
-}
-```
 
-Batch predictions are supported — send a JSON array to predict multiple customers in one request.
+## Logging
 
-### ML Pipeline (CLI)
+The API uses Python's `logging` module for structured log output. Log messages include timestamps, severity levels, and the module name. Logs are written to both stdout (captured by `docker logs`) and a persistent file at `logs/api.log` (shared with the host via a volume mount).
 
-The training and evaluation pipeline is still available via the command line:
+Predictions, validation failures, and errors are all logged. To view live container logs:
 
 ```bash
-make preprocess    # Clean raw data → data/processed/churn_processed.csv
-make train         # Train model   → models/model.pkl (+ MLflow logging)
-make tune          # Hyperparameter search → models/model_v1.pkl, model_v2.pkl
-make evaluate      # Report metrics on the held-out test split
-make predict       # Output churn predictions for each row
+docker compose logs -f api
 ```
 
-### Running Tests
+To view the persistent log file:
 
 ```bash
-make test                          # Run all tests
-pytest tests/test_api.py -v        # Run API tests only
+cat logs/api.log
 ```
 
-### Viewing Experiment History
+
+## Model artifacts
+
+The project produces two kinds of model:
+
+**Standard pipeline** (`models/model.pkl`) — created by `make train`. Uses the preprocessing from `preprocess.py` (LabelEncoder applied outside the pipeline). Requires the caller to encode categoricals first.
+
+**Deployment-ready pipeline** (`models/model_v1.pkl`, `models/model_v2.pkl`) — created by `make tune`. Has an OrdinalEncoder built into the pipeline's ColumnTransformer alongside StandardScaler. Accepts cleaned but unencoded data directly. These are what the API serves.
+
+
+## Experiment tracking
+
+MLflow logs every training and tuning run. To browse experiments locally:
 
 ```bash
 make mlflow-ui
-# Open http://127.0.0.1:5000 in your browser
-# (stop the API server first, or run MLflow on a different port)
 ```
 
-## Configuration
+When running Docker Compose, the MLflow service runs on port 5001 and the `mlruns/` directory is mounted as a volume. Training runs executed inside the container (via `make compose-train` or `make compose-tune`) log directly to the containerised MLflow server over the internal Docker network.
 
-All settings are centralised in `config/default.yaml`:
 
-```yaml
-paths:
-  raw_data: data/raw/WA_Fn-UseC_-Telco-Customer-Churn.csv
-  processed_data: data/processed/churn_processed.csv
-  model: models/model.pkl
-
-features:
-  numerical:
-    - tenure
-    - MonthlyCharges
-    - TotalCharges
-
-training:
-  test_size: 0.30
-  random_state: 40
-
-model:
-  name: GradientBoostingClassifier
-  params:
-    random_state: 40
-
-mlflow:
-  tracking_uri: mlruns
-  experiment_name: churn-prediction
-```
-
-Create alternative YAML files (e.g., `config/experimental.yaml`) to run experiments with different settings without editing code.
-
-## Architecture
-
-### Training Pipeline
-
-1. **Preprocessing** (`src/preprocess.py`): Loads the raw CSV, drops `customerID`, converts `TotalCharges` to numeric, removes zero-tenure rows, maps `SeniorCitizen` from 0/1 to "No"/"Yes", label-encodes all categorical columns, and writes the result as a processed CSV.
-
-2. **Training** (`src/train.py`): Reads the processed CSV, splits into train/test sets (stratified), builds a scikit-learn `Pipeline` with `StandardScaler` on numerical features and a `GradientBoostingClassifier`, fits it, evaluates on the test set, logs parameters and metrics to MLflow, and saves the pipeline as a pickle.
-
-3. **Hyperparameter Tuning** (`src/tune.py`): Searches across model families (GradientBoosting, RandomForest, LogisticRegression) and hyperparameter grids. Builds deployment-ready pipelines that include `OrdinalEncoder` for categoricals, so saved models accept raw string data directly. Logs all runs to MLflow and saves the top two by F1 score as `model_v1.pkl` and `model_v2.pkl`.
-
-### Serving Pipeline
-
-4. **REST API** (`src/app.py`): A Flask application that loads `model_v1` and `model_v2` at startup and exposes prediction endpoints. Accepts raw customer data as JSON, validates input, runs the model, and returns predictions. Flasgger provides interactive Swagger documentation at `/apidocs/`.
-
-### Model Artifacts
-
-The project maintains two types of model:
-
-- **`models/model.pkl`** — The standard training pipeline (from `train.py`), which expects pre-encoded data. Used for CLI evaluation and prediction.
-- **`models/model_v1.pkl` / `model_v2.pkl`** — Deployment-ready pipelines (from `tune.py`) with `OrdinalEncoder` built in. Accept raw string categorical data. Used by the API.
-
-## Data Versioning
+## Data versioning
 
 Data is managed with DVC and stored on DagsHub (S3-compatible remote). Git tracks `.dvc` metadata files; DVC tracks the actual data.
 
 ```bash
-# After changing data
 dvc add data/processed
 git add data/processed.dvc
 git commit -m "Update processed data"
 dvc push
-
-# Teammates sync with
-git pull && dvc pull
 ```
 
-## Experiment Tracking
+To sync on another machine: `git pull && dvc pull`.
 
-MLflow records parameters, metrics, and model artifacts for every training run. The tuning script creates a `churn-tuning` experiment with all hyperparameter combinations for easy comparison.
+
+## Testing
+
+Run the full test suite:
 
 ```bash
-make mlflow-ui
-# Select the "churn-tuning" experiment
-# Sort by f1_score to see the best models
+make test
 ```
+
+Tests use the Flask test client and do not require a running server or Docker container. The suite covers preprocessing logic, training output, YAML config loading, and all API endpoints including validation, batch predictions, and error handling.
+
+
+## Makefile reference
+
+| Target | Description |
+|--------|-------------|
+| `venv` | Create virtual environment and install dependencies |
+| `preprocess` | Run data cleaning and feature engineering |
+| `train` | Train a model and log to MLflow |
+| `tune` | Hyperparameter search; saves top two deployment-ready models |
+| `evaluate` | Evaluate saved model on test set |
+| `predict` | Run CLI prediction |
+| `test` | Run pytest suite |
+| `api` | Start Flask API locally (development server) |
+| `mlflow-ui` | Launch MLflow tracking UI |
+| `dvc-push` | Push data to DVC remote |
+| `dvc-pull` | Pull data from DVC remote |
+| `docker-build` | Build the API Docker image |
+| `docker-run` | Run the API container (detached, port 5000) |
+| `docker-stop` | Stop and remove the API container |
+| `compose-up` | Start API + MLflow via Docker Compose |
+| `compose-down` | Stop and remove all Compose containers |
+| `compose-train` | Run training inside the API container (logs to MLflow container) |
+| `compose-tune` | Run tuning inside the API container (logs to MLflow container) |
+| `docker-tag` | Tag images for Docker Hub (requires `DOCKER_USER`) |
+| `docker-push` | Push tagged images to Docker Hub (requires `DOCKER_USER`) |
+| `clean` | Remove virtual environment, models, processed data, mlruns, and logs |
+
 
 ## Technologies
 
-- **Python 3.12** — Language
-- **Flask** — REST API framework
-- **Flasgger** — Swagger/OpenAPI documentation
-- **scikit-learn** — ML pipelines, preprocessing, classification
-- **pandas / NumPy** — Data manipulation
-- **MLflow** — Experiment tracking and model logging
-- **DVC** — Data version control (DagsHub remote)
-- **pytest** — Automated testing (including API endpoint tests)
-- **PyYAML** — Configuration management
-- **Make** — Task automation
-
-## Dataset
-
-[Telco Customer Churn](https://www.kaggle.com/datasets/blastchar/telco-customer-churn) — 7,043 rows, 21 columns. Each row represents a customer; the target column is `Churn` (Yes/No).
+Python, pandas, NumPy, scikit-learn, MLflow, DVC, Flask, Flasgger, Gunicorn, Docker, Docker Compose, pytest, PyYAML.

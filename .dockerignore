@@ -4,7 +4,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Data (not needed by the API)
+# Data (mounted as volume, not baked into image)
 data/
 
 # Experiment tracking
@@ -27,10 +27,12 @@ Dockerfile.mlflow
 docker-compose.yml
 .dockerignore
 
-# Tests and config not needed at runtime
+# Tests not needed at runtime
 tests/
-config/
 pytest.ini
+
+# Logs
+logs/
 
 # Documentation
 *.md

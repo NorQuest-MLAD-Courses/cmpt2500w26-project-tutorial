@@ -4,6 +4,7 @@ Produces deployment-ready pipelines that handle full preprocessing internally.
 """
 
 import argparse
+import os
 import pickle
 import pandas as pd
 import numpy as np
@@ -84,7 +85,7 @@ def main():
     args = parse_args()
     cfg = load_config(args.config)
 
-    mlflow.set_tracking_uri(cfg["mlflow"]["tracking_uri"])
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", cfg["mlflow"]["tracking_uri"]))
     mlflow.set_experiment("churn-tuning")
 
     # Load raw data and apply cleaning only (no encoding)
