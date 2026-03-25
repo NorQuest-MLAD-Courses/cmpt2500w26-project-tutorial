@@ -11,8 +11,6 @@ models/*.pkl
 !models/.gitkeep
 
 # ---- Data ----
-# DVC also handles this via data/.gitignore, but we list it
-# here so the root .gitignore is self-documenting.
 data/processed/
 
 # ---- Experiment tracking (MLflow) ----
@@ -24,5 +22,8 @@ mlflow.db
 .dvc/tmp/
 .dvc/config.local
 
+# ---- Logs ----
+logs/
+
 # ---- IDE ----
-.vscode/
+.vscode/settings.json

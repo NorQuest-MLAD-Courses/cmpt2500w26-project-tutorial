@@ -1,9 +1,39 @@
-.PHONY: venv preprocess train tune evaluate predict test api mlflow-ui dvc-push dvc-pull docker-build docker-run docker-stop compose-up compose-down compose-train compose-tune docker-tag docker-push clean
+SHELL := /bin/bash
+
+.PHONY: setup venv preprocess train tune evaluate predict test api mlflow-ui dvc-push dvc-pull docker-build docker-run docker-stop compose-up compose-down compose-train compose-tune docker-tag docker-push deploy clean
 
 venv:
 	python3 -m venv .venv
 	.venv/bin/pip install --upgrade pip
 	.venv/bin/pip install -r requirements.txt
+
+setup:
+	@echo "Creating virtual environment ..."
+	python3 -m venv .venv
+	.venv/bin/pip install --upgrade pip
+	.venv/bin/pip install -r requirements.txt
+	@echo ""
+	@echo "Configuring DVC remote credentials ..."
+	@read -s -p "DagsHub Access Key ID: " KEY_ID && echo "" && \
+	 read -s -p "DagsHub Secret Access Key: " SECRET_KEY && echo "" && \
+	 .venv/bin/dvc remote modify origin --local access_key_id "$$KEY_ID" && \
+	 .venv/bin/dvc remote modify origin --local secret_access_key "$$SECRET_KEY"
+	@echo "Pulling data from DVC remote ..."
+	.venv/bin/dvc pull
+	@echo ""
+	@echo "Installing Google Cloud CLI ..."
+	@if ! command -v gcloud &> /dev/null; then \
+		echo "gcloud not found — installing ..."; \
+		curl -sSL https://sdk.cloud.google.com | bash -s -- --disable-prompts; \
+		echo ""; \
+		echo "gcloud installed. Restart your shell (exec -l $$SHELL) then run:"; \
+		echo "  gcloud auth login"; \
+		echo "  gcloud config set project <YOUR_PROJECT_ID>"; \
+	else \
+		echo "gcloud already installed: $$(gcloud --version 2>&1 | head -1)"; \
+	fi
+	@echo ""
+	@echo "Setup complete. Run 'make test' to verify."
 
 preprocess:
 	.venv/bin/python src/preprocess.py
@@ -51,10 +81,10 @@ compose-down:
 	docker compose down
 
 compose-train:
-	docker compose run --rm --workdir /app/src api python train.py
+	docker compose run --rm api python src/train.py
 
 compose-tune:
-	docker compose run --rm --workdir /app/src api python tune.py
+	docker compose run --rm api python src/tune.py
 
 docker-tag:
 	docker tag churn-api $(DOCKER_USER)/churn-api:latest
@@ -63,6 +93,14 @@ docker-tag:
 docker-push:
 	docker push $(DOCKER_USER)/churn-api:latest
 	docker push $(DOCKER_USER)/churn-mlflow:latest
+
+deploy:
+	gcloud run deploy churn-api \
+		--image $(DOCKER_USER)/churn-api:latest \
+		--platform managed \
+		--region us-central1 \
+		--port 5000 \
+		--allow-unauthenticated
 
 clean:
 	rm -rf .venv models/*.pkl data/processed/*.csv mlruns/ logs/
