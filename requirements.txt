@@ -9,3 +9,5 @@ dvc-s3
 flask
 flasgger
 gunicorn
+prometheus-client
+prometheus_flask_exporter
