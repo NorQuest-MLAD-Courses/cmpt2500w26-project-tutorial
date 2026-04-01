@@ -12,3 +12,4 @@ gunicorn
 prometheus-client
 prometheus_flask_exporter
 psutil
+evidently

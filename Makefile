@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: setup venv preprocess train tune evaluate predict test api mlflow-ui dvc-push dvc-pull docker-build docker-run docker-stop compose-up compose-down compose-train compose-tune docker-tag docker-push deploy clean
+.PHONY: setup venv preprocess train tune evaluate predict test api mlflow-ui dvc-push dvc-pull docker-build docker-run docker-stop compose-up compose-down compose-train compose-tune docker-tag docker-push deploy drift compose-drift clean
 
 venv:
 	python3 -m venv .venv
@@ -66,13 +66,13 @@ dvc-pull:
 	dvc pull
 
 docker-build:
-	docker build -t cmpt2500w26-project-tutorial-api .
+	docker build -t churn-api .
 
 docker-run:
-	docker run -d --name cmpt2500w26-project-tutorial-api -p 5000:5000 cmpt2500w26-project-tutorial-api
+	docker run -d --name churn-api -p 5000:5000 churn-api
 
 docker-stop:
-	docker stop cmpt2500w26-project-tutorial-api && docker rm cmpt2500w26-project-tutorial-api
+	docker stop churn-api && docker rm churn-api
 
 compose-up:
 	docker compose up --build -d
@@ -87,20 +87,26 @@ compose-tune:
 	docker compose run --rm api python src/tune.py
 
 docker-tag:
-	docker tag cmpt2500w26-project-tutorial-api $(DOCKER_USER)/cmpt2500w26-project-tutorial-api:latest
-	docker tag $(shell docker compose images mlflow -q) $(DOCKER_USER)/cmpt2500w26-project-tutorial-mlflow:latest
+	docker tag churn-api $(DOCKER_USER)/churn-api:latest
+	docker tag $(shell docker compose images mlflow -q) $(DOCKER_USER)/churn-mlflow:latest
 
 docker-push:
-	docker push $(DOCKER_USER)/cmpt2500w26-project-tutorial-api:latest
-	docker push $(DOCKER_USER)/cmpt2500w26-project-tutorial-mlflow:latest
+	docker push $(DOCKER_USER)/churn-api:latest
+	docker push $(DOCKER_USER)/churn-mlflow:latest
 
 deploy:
-	gcloud run deploy cmpt2500w26-project-tutorial-api \
-		--image $(DOCKER_USER)/cmpt2500w26-project-tutorial-api:latest \
+	gcloud run deploy churn-api \
+		--image $(DOCKER_USER)/churn-api:latest \
 		--platform managed \
 		--region us-central1 \
 		--port 5000 \
 		--allow-unauthenticated
 
 clean:
-	rm -rf .venv models/*.pkl data/processed/*.csv mlruns/ logs/
+	rm -rf .venv models/*.pkl data/processed/*.csv mlruns/ logs/ reports/
+
+drift:
+	.venv/bin/python src/drift.py
+
+compose-drift:
+	docker compose run --rm -v ./reports:/app/reports api python src/drift.py

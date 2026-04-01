@@ -1,6 +1,20 @@
 # Telco Customer Churn Prediction
 
-An end-to-end machine learning project that predicts whether a telecom customer will churn. The project spans data preprocessing, model training, experiment tracking, hyperparameter tuning, a REST API, containerisation, cloud deployment on Google Cloud Run, and CI/CD with GitHub Actions.
+A production-grade machine learning system that predicts whether a telecom customer will churn. Built as an end-to-end MLOps project covering the full lifecycle from raw data to a monitored, cloud-deployed prediction service.
+
+| Layer | Tools |
+|-------|-------|
+| Data pipeline | pandas, NumPy, DVC |
+| Training and tuning | scikit-learn, MLflow |
+| API | Flask, Flasgger (Swagger), Gunicorn |
+| Containerisation | Docker, Docker Compose |
+| Cloud deployment | Google Cloud Run |
+| CI/CD | GitHub Actions |
+| Infrastructure monitoring | Prometheus, Grafana |
+| Training monitoring | Custom Prometheus metrics, psutil |
+| Model monitoring | Evidently |
+| Alerting | Prometheus alert rules |
+| Testing | pytest (17 tests) |
 
 
 ## Project structure
@@ -9,37 +23,55 @@ An end-to-end machine learning project that predicts whether a telecom customer 
 churn-prediction/
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml              # Run tests on every push and PR
-│       └── deploy.yml          # Build, push, and deploy on push to main
+│       ├── ci.yml                  # Run tests on every push and PR
+│       └── deploy.yml              # Build, push, and deploy on push to main
 ├── src/
-│   ├── preprocess.py           # Data cleaning and feature encoding
-│   ├── train.py                # Model training with MLflow logging
-│   ├── tune.py                 # Hyperparameter search (deployment-ready pipelines)
-│   ├── evaluate.py             # Model evaluation and metrics
-│   ├── predict.py              # CLI predictions from a saved model
-│   ├── app.py                  # Flask REST API with structured logging
+│   ├── __init__.py
+│   ├── preprocess.py               # Data cleaning and feature encoding
+│   ├── train.py                    # Model training with MLflow logging
+│   ├── tune.py                     # Hyperparameter search (deployment-ready pipelines)
+│   ├── evaluate.py                 # Model evaluation and metrics
+│   ├── predict.py                  # CLI predictions from a saved model
+│   ├── drift.py                    # Evidently data drift detection
+│   ├── app.py                      # Flask REST API with logging, Prometheus metrics
 │   └── utils/
 │       ├── __init__.py
-│       └── config.py           # YAML config loader
+│       ├── config.py               # YAML config loader
+│       └── monitoring.py           # Training process Prometheus metrics
 ├── tests/
-│   ├── test_preprocess.py
-│   ├── test_train.py
-│   ├── test_config.py
-│   └── test_api.py
+│   ├── __init__.py
+│   ├── test_preprocess.py          # 4 tests
+│   ├── test_train.py               # 1 test
+│   ├── test_config.py              # 2 tests
+│   └── test_api.py                 # 10 tests (health, predict, validation, batch, info, metrics)
 ├── config/
-│   └── default.yaml            # Centralised project settings
-├── models/                     # Saved model artifacts (.pkl, git-ignored)
+│   └── default.yaml
+├── monitoring/
+│   ├── prometheus.yml              # Prometheus scrape and alert configuration
+│   ├── rules/
+│   │   └── ml_alerts.yml           # Alert rules (error rate, latency, memory, API down)
+│   └── grafana/
+│       ├── provisioning/
+│       │   ├── datasources/
+│       │   │   └── prometheus.yml
+│       │   └── dashboards/
+│       │       └── dashboards.yml
+│       └── dashboards/
+│           ├── api-dashboard.json      # API performance dashboard
+│           └── training-dashboard.json # Training monitoring dashboard
+├── models/
 ├── data/
-│   ├── raw/                    # Original CSV (tracked by DVC)
-│   └── processed/              # Cleaned CSV (tracked by DVC)
-├── logs/                       # Application logs (git-ignored)
-├── Dockerfile                  # API container image
-├── Dockerfile.mlflow           # MLflow server container image
-├── docker-compose.yml          # Multi-container orchestration
-├── .dockerignore               # Files excluded from Docker build context
-├── requirements.txt            # Python dependencies
-├── Makefile                    # Automation targets
-├── pytest.ini                  # Test configuration
+│   ├── raw/
+│   └── processed/
+├── logs/
+├── reports/
+├── Dockerfile
+├── Dockerfile.mlflow
+├── docker-compose.yml              # 4 services: API, MLflow, Prometheus, Grafana
+├── .dockerignore
+├── requirements.txt
+├── Makefile
+├── pytest.ini
 ├── .gitignore
 └── README.md
 ```
@@ -47,158 +79,107 @@ churn-prediction/
 
 ## Quick start
 
-### Prerequisites
-
-Python 3.10+, pip, and Git. For containerised deployment, Docker and Docker Compose. For cloud deployment, the Google Cloud CLI (`gcloud`). GitHub Codespaces includes all of these except `gcloud`, which `make setup` will install automatically.
-
-### Local setup
-
 ```bash
 git clone <your-repo-url>
 cd churn-prediction
-make venv
-dvc pull
-```
-
-### Run the ML pipeline
-
-```bash
+make setup            # Creates venv, prompts for DagsHub keys, pulls data
 make preprocess
 make train
-make evaluate
-```
-
-### Hyperparameter tuning
-
-```bash
 make tune
 ```
 
-Produces `models/model_v1.pkl` (best F1) and `models/model_v2.pkl` (second-best).
 
-### Run the API locally
+## Docker Compose (full stack)
 
-```bash
-make api
-```
-
-The API starts on `http://localhost:5000`. Swagger docs at `/apidocs/`.
-
-
-## Docker
-
-### Single container (API only)
-
-```bash
-make docker-build
-make docker-run
-```
-
-### Docker Compose (API + MLflow)
+Launch all four services:
 
 ```bash
 make compose-up
 ```
 
-| Service | Port | URL |
-|---------|------|-----|
-| API | 5000 | `http://localhost:5000` |
-| MLflow UI | 5001 | `http://localhost:5001` |
+| Service | Port | URL | Purpose |
+|---------|------|-----|---------|
+| API | 5000 | `http://localhost:5000` | Prediction endpoints + Swagger |
+| MLflow | 5001 | `http://localhost:5001` | Experiment tracking UI |
+| Prometheus | 9090 | `http://localhost:9090` | Metrics collection, alerting |
+| Grafana | 3000 | `http://localhost:3000` | Monitoring dashboards |
 
-Run training inside the container (logs to the MLflow container):
+Grafana credentials: `admin` / `admin`.
+
+
+## Monitoring
+
+### API monitoring (Prometheus + Grafana)
+
+The API exposes `/metrics` with both auto-generated HTTP metrics and custom application metrics (prediction count by model version and status, prediction latency histogram, active model gauge). Prometheus scrapes every 5 seconds. Grafana provides two pre-provisioned dashboards:
+
+**API Performance** — request rate, latency percentiles (p50/p95/p99), error rate, prediction requests by model version.
+
+**Training Monitoring** — training vs validation accuracy, training vs validation F1, CPU usage, memory usage, feature importances, epochs completed.
+
+### Training monitoring
+
+`src/utils/monitoring.py` provides a `TrainingMonitor` class that starts a standalone HTTP server on port 8002, exposing training-specific metrics (accuracy, F1, feature importance) and system resource metrics (CPU, memory via psutil). Prometheus scrapes this endpoint alongside the API.
+
+### Alerting
+
+Prometheus alert rules in `monitoring/rules/ml_alerts.yml` fire on four conditions: high prediction error rate (> 10%), slow response time (p95 > 1s), API down (scrape failures), and high training memory (> 1.5 GB). View active alerts at `http://localhost:9090/alerts`.
+
+### Model monitoring (Evidently)
+
+Detect data drift between training and production distributions:
 
 ```bash
-make compose-train
-make compose-tune
+make drift                    # Simulated drift → reports/drift_report.html
 ```
-
-Stop:
-
-```bash
-make compose-down
-```
-
-
-## Cloud deployment
-
-The API is deployed to Google Cloud Run as a serverless container. Cloud Run scales to zero when idle and starts on demand, keeping costs at $0 for low-traffic usage.
-
-### Manual deployment
-
-```bash
-DOCKER_USER=<your-dockerhub-username> make docker-push
-DOCKER_USER=<your-dockerhub-username> make deploy
-```
-
-This pushes the image to Docker Hub and deploys it to Cloud Run. The command outputs a public HTTPS URL like `https://churn-api-xxxxx-uc.a.run.app`.
-
-### CI/CD with GitHub Actions
-
-Every push to `main` and every pull request triggers the CI workflow (`.github/workflows/ci.yml`), which runs the full pytest suite.
-
-Pushes to `main` additionally trigger the CD workflow (`.github/workflows/deploy.yml`), which builds the Docker image, pushes it to Google Artifact Registry, and deploys it to Cloud Run. This requires two GitHub repository secrets:
-
-- `GCP_SA_KEY` — a JSON service account key with Cloud Run and Artifact Registry permissions.
-- `GCP_PROJECT_ID` — your Google Cloud project ID.
-
-After setup, every merged pull request automatically deploys the latest code to production.
 
 
 ## API endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/health` | Returns `{"status": "ok"}` if the service is running |
-| GET | `/info` | Returns available endpoints, required features, and an example payload |
-| POST | `/v1/predict` | Churn prediction using model v1 (best F1) |
-| POST | `/v2/predict` | Churn prediction using model v2 (second-best F1) |
-| GET | `/apidocs/` | Interactive Swagger UI for testing endpoints |
+| GET | `/health` | Service health check |
+| GET | `/info` | API docs, feature definitions, example payload |
+| GET | `/metrics` | Prometheus metrics (auto + custom) |
+| POST | `/v1/predict` | Prediction using model v1 |
+| POST | `/v2/predict` | Prediction using model v2 |
+| GET | `/apidocs/` | Interactive Swagger UI |
 
-### Example request
+
+## Cloud deployment
+
+Deployed to Google Cloud Run. CI/CD via GitHub Actions. See [GCP Setup Guide](gcp_setup_guide.md).
 
 ```bash
-curl -X POST https://<your-cloud-run-url>/v1/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenure": 12, "MonthlyCharges": 59.95, "TotalCharges": 720.50,
-    "Contract": "One year", "PaymentMethod": "Electronic check",
-    "OnlineSecurity": "No", "TechSupport": "No", "InternetService": "DSL",
-    "gender": "Female", "SeniorCitizen": "No", "Partner": "Yes",
-    "Dependents": "No", "PhoneService": "Yes", "MultipleLines": "No",
-    "PaperlessBilling": "Yes", "OnlineBackup": "Yes",
-    "DeviceProtection": "No", "StreamingTV": "No", "StreamingMovies": "No"
-  }'
+DOCKER_USER=<username> make docker-push
+DOCKER_USER=<username> make deploy
 ```
-
-
-## Logging
-
-The API uses Python's `logging` module. Logs are written to stdout (captured by `docker logs` and Cloud Run's log viewer) and to `logs/api.log` (persisted via volume mount in Docker Compose).
 
 
 ## Makefile reference
 
 | Target | Description |
 |--------|-------------|
+| `setup` | One-command setup: create venv, configure DagsHub credentials, pull data |
 | `venv` | Create virtual environment and install dependencies |
-| `preprocess` | Run data cleaning and feature engineering |
-| `train` | Train a model and log to MLflow |
-| `tune` | Hyperparameter search; saves top two deployment-ready models |
-| `evaluate` | Evaluate saved model on test set |
-| `predict` | Run CLI prediction |
-| `test` | Run pytest suite |
-| `api` | Start Flask API locally (development server) |
+| `preprocess` | Clean raw data |
+| `train` | Train model, log to MLflow |
+| `tune` | Hyperparameter search, save top two models |
+| `evaluate` | Evaluate saved model |
+| `predict` | CLI prediction |
+| `test` | Run pytest suite (17 tests) |
+| `api` | Start Flask dev server |
 | `mlflow-ui` | Launch MLflow tracking UI |
-| `dvc-push` / `dvc-pull` | Push/pull data to/from DVC remote |
-| `docker-build` | Build the API Docker image |
-| `docker-run` / `docker-stop` | Run/stop the API container |
-| `compose-up` / `compose-down` | Start/stop API + MLflow via Docker Compose |
-| `compose-train` / `compose-tune` | Run training/tuning inside the container |
-| `docker-tag` / `docker-push` | Tag and push images to Docker Hub |
-| `deploy` | Deploy API image to Google Cloud Run |
+| `dvc-push` / `dvc-pull` | Push/pull data |
+| `docker-build` / `docker-run` / `docker-stop` | Single container |
+| `compose-up` / `compose-down` | Full stack (4 services) |
+| `compose-train` / `compose-tune` | Train/tune inside container |
+| `docker-tag` / `docker-push` | Push to Docker Hub |
+| `deploy` | Deploy to Cloud Run |
+| `drift` / `compose-drift` | Generate drift report |
 | `clean` | Remove generated files |
 
 
 ## Technologies
 
-Python, pandas, NumPy, scikit-learn, MLflow, DVC, Flask, Flasgger, Gunicorn, Docker, Docker Compose, Google Cloud Run, GitHub Actions, pytest, PyYAML.
+Python, pandas, NumPy, scikit-learn, MLflow, DVC, Flask, Flasgger, Gunicorn, Docker, Docker Compose, Prometheus, Grafana, Evidently, psutil, Google Cloud Run, GitHub Actions, pytest, PyYAML.

@@ -1,0 +1,49 @@
+groups:
+  - name: ml_application_alerts
+    rules:
+      # Alert: prediction error rate exceeds 10%
+      - alert: HighPredictionErrorRate
+        expr: >
+          sum(rate(prediction_requests_total{status=~"error|validation_error"}[5m]))
+          /
+          sum(rate(prediction_requests_total[5m]))
+          > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High prediction error rate (> 10%)"
+          description: "Prediction API error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      # Alert: 95th percentile response time exceeds 1 second
+      - alert: SlowPredictionResponse
+        expr: >
+          histogram_quantile(0.95,
+            sum(rate(prediction_duration_seconds_bucket[5m])) by (le, model_version)
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow prediction response time"
+          description: "95th percentile response time for model {{ $labels.model_version }} is {{ $value }}s."
+
+      # Alert: API is down (no successful scrapes)
+      - alert: APIDown
+        expr: up{job="churn-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Churn API is down"
+          description: "Prometheus has not been able to scrape the API for over 1 minute."
+
+      # Alert: high memory usage during training
+      - alert: HighTrainingMemory
+        expr: training_memory_usage_bytes / 1024 / 1024 / 1024 > 1.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage during training"
+          description: "Training process is using {{ $value | humanize }}GB of memory."

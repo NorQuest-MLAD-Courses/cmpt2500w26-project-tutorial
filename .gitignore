@@ -27,3 +27,6 @@ logs/
 
 # ---- IDE ----
 .vscode/
+
+# ---- Monitoring reports ----
+reports/
