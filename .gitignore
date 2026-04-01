@@ -26,4 +26,4 @@ mlflow.db
 logs/
 
 # ---- IDE ----
-.vscode/settings.json
+.vscode/

@@ -34,5 +34,8 @@ pytest.ini
 # Logs
 logs/
 
+# Monitoring configs
+monitoring/
+
 # Documentation
 *.md
