@@ -8,6 +8,9 @@ import pickle
 import pandas as pd
 from flask import Flask, jsonify, request
 from flasgger import Swagger
+from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge
 
 # ---- Logging configuration ----
 
@@ -29,6 +32,30 @@ logger = logging.getLogger("churn_api")
 app = Flask(__name__)
 swagger = Swagger(app)
 
+# ---- Prometheus metrics ----
+
+# Auto-instrument all routes (request count, latency histograms)
+metrics = PrometheusMetrics(app, path=None)
+
+# Custom application-level metrics
+PREDICTION_REQUESTS = Counter(
+    "prediction_requests_total",
+    "Total prediction requests by model version and outcome",
+    ["model_version", "status"],
+)
+
+PREDICTION_LATENCY = Histogram(
+    "prediction_duration_seconds",
+    "Time spent processing a prediction request",
+    ["model_version"],
+    buckets=[0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5],
+)
+
+ACTIVE_MODELS = Gauge(
+    "active_models_loaded",
+    "Number of models currently loaded in memory",
+)
+
 
 # ---- Load models at startup ----
 
@@ -42,6 +69,8 @@ MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 
 model_v1 = load_model(os.path.join(MODEL_DIR, "model_v1.pkl"))
 model_v2 = load_model(os.path.join(MODEL_DIR, "model_v2.pkl"))
+
+ACTIVE_MODELS.set(2)
 
 logger.info("Loaded model_v1 and model_v2 from %s", MODEL_DIR)
 
@@ -92,6 +121,9 @@ def run_prediction(model, model_label, json_data):
     Validate, predict, and format results.
     Handles both single records and batches.
     """
+    import time
+    start_time = time.time()
+
     is_batch = isinstance(json_data, list)
     records = json_data if is_batch else [json_data]
 
@@ -99,6 +131,7 @@ def run_prediction(model, model_label, json_data):
     for record in records:
         error, status = validate_input(record)
         if error:
+            PREDICTION_REQUESTS.labels(model_version=model_label, status="validation_error").inc()
             logger.warning("Validation failed for %s: %s", model_label, error)
             return jsonify({"error": error}), status
 
@@ -107,8 +140,13 @@ def run_prediction(model, model_label, json_data):
         yhat = model.predict(input_df)
         proba = model.predict_proba(input_df)
     except Exception as e:
+        PREDICTION_REQUESTS.labels(model_version=model_label, status="error").inc()
         logger.error("Prediction failed for %s: %s", model_label, str(e))
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
+
+    duration = time.time() - start_time
+    PREDICTION_REQUESTS.labels(model_version=model_label, status="success").inc()
+    PREDICTION_LATENCY.labels(model_version=model_label).observe(duration)
 
     results = []
     for i in range(len(yhat)):
@@ -126,6 +164,11 @@ def run_prediction(model, model_label, json_data):
 
 
 # ---- Endpoints ----
+
+@app.route("/metrics", methods=["GET"])
+def prometheus_metrics():
+    """Expose Prometheus metrics."""
+    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -158,6 +201,7 @@ def info():
             "predict_v1": "POST /v1/predict",
             "predict_v2": "POST /v2/predict",
             "docs": "GET /apidocs/",
+            "metrics": "GET /metrics",
         },
         "required_input_format": {
             "numerical_features": NUMERICAL_FEATURES,
@@ -266,18 +310,6 @@ def predict_v1():
     responses:
       200:
         description: Prediction successful.
-        schema:
-          type: object
-          properties:
-            prediction:
-              type: string
-              example: "No"
-            probability:
-              type: number
-              example: 0.9431
-            model_version:
-              type: string
-              example: "v1"
       400:
         description: Invalid input data.
       500:
@@ -369,18 +401,6 @@ def predict_v2():
     responses:
       200:
         description: Prediction successful.
-        schema:
-          type: object
-          properties:
-            prediction:
-              type: string
-              example: "No"
-            probability:
-              type: number
-              example: 0.9431
-            model_version:
-              type: string
-              example: "v2"
       400:
         description: Invalid input data.
       500:

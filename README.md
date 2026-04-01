@@ -49,14 +49,15 @@ churn-prediction/
 
 ### Prerequisites
 
-Python 3.10+, pip, and Git. For containerised deployment, Docker and Docker Compose. For cloud deployment, the Google Cloud CLI (`gcloud`). GitHub Codespaces includes all of these.
+Python 3.10+, pip, and Git. For containerised deployment, Docker and Docker Compose. For cloud deployment, the Google Cloud CLI (`gcloud`). GitHub Codespaces includes all of these except `gcloud`, which `make setup` will install automatically.
 
 ### Local setup
 
 ```bash
 git clone <your-repo-url>
 cd churn-prediction
-make setup
+make venv
+dvc pull
 ```
 
 ### Run the ML pipeline
@@ -179,7 +180,6 @@ The API uses Python's `logging` module. Logs are written to stdout (captured by 
 
 | Target | Description |
 |--------|-------------|
-| `setup` | One-command setup: create venv, configure DagsHub credentials, pull data |
 | `venv` | Create virtual environment and install dependencies |
 | `preprocess` | Run data cleaning and feature engineering |
 | `train` | Train a model and log to MLflow |

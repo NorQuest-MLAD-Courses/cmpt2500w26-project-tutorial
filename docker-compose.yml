@@ -30,6 +30,18 @@ services:
       - ml-network
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - api
+    networks:
+      - ml-network
+    restart: unless-stopped
+
 networks:
   ml-network:
     driver: bridge

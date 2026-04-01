@@ -113,3 +113,19 @@ def test_info(client):
     assert "numerical_features" in response.json["required_input_format"]
     assert "categorical_features" in response.json["required_input_format"]
     assert "example" in response.json["required_input_format"]
+
+
+# ---- Step 17: Prometheus metrics ----
+
+def test_metrics(client):
+    """GET /metrics returns Prometheus-format metrics."""
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert b"flask_http_request" in response.data
+
+
+def test_custom_prediction_counter(client):
+    """After a prediction, the custom counter increments."""
+    client.post("/v1/predict", json=VALID_PAYLOAD)
+    response = client.get("/metrics")
+    assert b"prediction_requests_total" in response.data

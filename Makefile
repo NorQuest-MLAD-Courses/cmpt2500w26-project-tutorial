@@ -66,13 +66,13 @@ dvc-pull:
 	dvc pull
 
 docker-build:
-	docker build -t churn-api .
+	docker build -t cmpt2500w26-project-tutorial-api .
 
 docker-run:
-	docker run -d --name churn-api -p 5000:5000 churn-api
+	docker run -d --name cmpt2500w26-project-tutorial-api -p 5000:5000 cmpt2500w26-project-tutorial-api
 
 docker-stop:
-	docker stop churn-api && docker rm churn-api
+	docker stop cmpt2500w26-project-tutorial-api && docker rm cmpt2500w26-project-tutorial-api
 
 compose-up:
 	docker compose up --build -d
@@ -87,16 +87,16 @@ compose-tune:
 	docker compose run --rm api python src/tune.py
 
 docker-tag:
-	docker tag churn-api $(DOCKER_USER)/churn-api:latest
-	docker tag $(shell docker compose images mlflow -q) $(DOCKER_USER)/churn-mlflow:latest
+	docker tag cmpt2500w26-project-tutorial-api $(DOCKER_USER)/cmpt2500w26-project-tutorial-api:latest
+	docker tag $(shell docker compose images mlflow -q) $(DOCKER_USER)/cmpt2500w26-project-tutorial-mlflow:latest
 
 docker-push:
-	docker push $(DOCKER_USER)/churn-api:latest
-	docker push $(DOCKER_USER)/churn-mlflow:latest
+	docker push $(DOCKER_USER)/cmpt2500w26-project-tutorial-api:latest
+	docker push $(DOCKER_USER)/cmpt2500w26-project-tutorial-mlflow:latest
 
 deploy:
-	gcloud run deploy churn-api \
-		--image $(DOCKER_USER)/churn-api:latest \
+	gcloud run deploy cmpt2500w26-project-tutorial-api \
+		--image $(DOCKER_USER)/cmpt2500w26-project-tutorial-api:latest \
 		--platform managed \
 		--region us-central1 \
 		--port 5000 \
